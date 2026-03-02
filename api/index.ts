@@ -6,18 +6,47 @@ import { createClient } from "@supabase/supabase-js";
 dotenv.config();
 
 // Supabase Client Initialization
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+let supabaseClient: any = null;
+const getSupabase = () => {
+  if (!supabaseClient) {
+    const supabaseUrl = process.env.SUPABASE_URL || "";
+    const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing Supabase environment variables");
+    }
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
+};
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let aiClient: any = null;
+const getAI = () => {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY || "";
+    if (!apiKey) {
+      throw new Error("Missing GEMINI_API_KEY environment variable");
+    }
+    aiClient = new GoogleGenAI({ apiKey });
+  }
+  return aiClient;
+};
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
+// Health check
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", env: {
+    hasGemini: !!process.env.GEMINI_API_KEY,
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasSupabaseKey: !!process.env.SUPABASE_ANON_KEY
+  }});
+});
+
 // API endpoint to fetch items
 app.get("/api/items", async (req, res) => {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('items')
       .select('*')
@@ -38,6 +67,9 @@ app.post("/api/auto-upload", async (req, res) => {
   }
 
   try {
+    const ai = getAI();
+    const supabase = getSupabase();
+    
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
@@ -132,6 +164,7 @@ app.post("/api/auto-upload", async (req, res) => {
 // API endpoint to delete an item
 app.delete("/api/items/:id", async (req, res) => {
   try {
+    const supabase = getSupabase();
     const { error } = await supabase
       .from('items')
       .delete()

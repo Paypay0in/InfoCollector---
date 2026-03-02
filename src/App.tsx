@@ -114,11 +114,20 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+        let errorMessage = 'Upload failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // If not JSON, get the text
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
       
-      const { data: result, id } = await response.json();
+      const responseData = await response.json();
+      const { data: result, id } = responseData;
       
       const newItem: CollectedItem = {
         id,
