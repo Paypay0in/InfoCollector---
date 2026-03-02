@@ -9,10 +9,13 @@ dotenv.config();
 let supabaseClient: any = null;
 const getSupabase = () => {
   if (!supabaseClient) {
-    const supabaseUrl = process.env.SUPABASE_URL || "";
-    const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Missing Supabase environment variables");
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl) {
+      throw new Error("環境變數遺失：請在 Vercel 設定 SUPABASE_URL");
+    }
+    if (!supabaseKey) {
+      throw new Error("環境變數遺失：請在 Vercel 設定 SUPABASE_ANON_KEY");
     }
     supabaseClient = createClient(supabaseUrl, supabaseKey);
   }
@@ -22,9 +25,9 @@ const getSupabase = () => {
 let aiClient: any = null;
 const getAI = () => {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY || "";
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("Missing GEMINI_API_KEY environment variable");
+      throw new Error("環境變數遺失：請在 Vercel 設定 GEMINI_API_KEY");
     }
     aiClient = new GoogleGenAI({ apiKey });
   }
