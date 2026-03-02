@@ -39,11 +39,18 @@ app.use(express.json({ limit: '50mb' }));
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", env: {
-    hasGemini: !!process.env.GEMINI_API_KEY,
-    hasSupabaseUrl: !!process.env.SUPABASE_URL,
-    hasSupabaseKey: !!process.env.SUPABASE_ANON_KEY
-  }});
+  const envKeys = Object.keys(process.env);
+  res.json({ 
+    status: "ok", 
+    availableKeys: envKeys.filter(key => 
+      key.includes("SUPABASE") || key.includes("GEMINI") || key.includes("API")
+    ),
+    envStatus: {
+      hasGemini: !!process.env.GEMINI_API_KEY,
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasSupabaseKey: !!process.env.SUPABASE_ANON_KEY
+    }
+  });
 });
 
 // API endpoint to fetch items
