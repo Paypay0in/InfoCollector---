@@ -1,0 +1,5 @@
+{
+  "name": "InfoCollector - 智慧資訊整理助手",
+  "description": "上傳貼文截圖，自動辨識並分類餐廳、甜點店與學習資訊，打造個人化的探店清單與知識庫。",
+  "requestFramePermissions": []
+}
