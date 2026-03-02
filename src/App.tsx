@@ -71,17 +71,46 @@ export default function App() {
   const processFile = async (file: File) => {
     setIsUploading(true);
     try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => resolve(reader.result as string);
+      // 1. Image Compression Logic
+      const compressedBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
         reader.readAsDataURL(file);
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target?.result as string;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            // Max width/height 1200px for AI analysis is plenty
+            const MAX_SIZE = 1200;
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height *= MAX_SIZE / width;
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width *= MAX_SIZE / height;
+                height = MAX_SIZE;
+              }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            // Compress to JPEG with 0.7 quality
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+        };
       });
-      const base64 = await base64Promise;
 
       const response = await fetch('/api/auto-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64 }),
+        body: JSON.stringify({ imageBase64: compressedBase64 }),
       });
 
       if (!response.ok) throw new Error('Upload failed');
