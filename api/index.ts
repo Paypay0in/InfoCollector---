@@ -68,7 +68,7 @@ app.post("/api/auto-upload", async (req, res) => {
         },
       ],
       config: {
-        tools: [{ googleSearch: {} }],
+        // Removed googleSearch to stay under Vercel's 10s timeout limit
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
