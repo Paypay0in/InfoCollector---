@@ -93,12 +93,17 @@ app.post("/api/auto-upload", async (req, res) => {
             },
             {
               text: `請分析這張截圖，提取其中的關鍵資訊。
-如果是餐廳、甜點店、商店或任何實體店面，請分類為 FOOD；如果是學習資料、知識點或教學，請分類為 LEARNING；其他則為 OTHER。
+請根據內容將其分類為以下三類之一：
+1. **FOOD** (探店)：如果是餐廳、甜點店、咖啡廳或任何餐飲相關。
+   - 必須進一步識別子分類 (subCategory)：日式料理、美式料理、台式料理、咖啡廳、甜點、拉麵、韓式料理等。
+2. **LEARNING** (學習)：如果是學習資料、知識點、教學或筆記。
+3. **SHOPPING** (購物)：如果是商店、服飾、化妝品、電子產品或任何購物相關。
+4. **OTHER** (其他)：不屬於上述三類的資訊。
 
 請執行以下任務：
 1. **標題提取**：請明確寫出被分享的「店家名稱」與「具體商品/餐點名稱」。禁止使用如「挖寶」、「好物分享」、「必買」等模糊字眼。格式範例：「[店家名] - [商品名]」。
 2. **內容摘要**：請提取重點並保持極簡（不超過 3 個短句）。**每一點都必須獨立一行，使用分項符號（如 • 或 -）開頭，並在每點之間插入換行符號 \\n**。
-3. **子分類識別**：如果是 FOOD，請識別具體類型（如：購物、日式料理、韓式料理、甜點、咖啡廳、服飾、拉麵等）。
+3. **子分類識別**：如果是 FOOD，請務必識別具體類型（如：日式料理、美式料理、台式料理、咖啡廳等）。
 4. 找出該地點所屬的「行政區或地區 (Region/Area)」，例如：信義區、大安區、澀谷、中西區等。
 5. 找出該地點最近的「地鐵/捷運站點 (Subway Station)」。
 6. 找出該地點附近是否有「大學或學院 (College/University)」，並簡述。
@@ -116,7 +121,7 @@ app.post("/api/auto-upload", async (req, res) => {
           type: Type.OBJECT,
           properties: {
             title: { type: Type.STRING, description: "明確的標題，格式為：店家名 - 商品名。禁止使用模糊字眼。" },
-            category: { type: Type.STRING, description: "分類 (FOOD, LEARNING, OTHER)" },
+            category: { type: Type.STRING, description: "分類 (FOOD, LEARNING, SHOPPING, OTHER)" },
             subCategory: { type: Type.STRING, description: "具體的子分類" },
             content: { type: Type.STRING, description: "內容摘要，必須包含分項符號與強制換行符號 \\n，確保每點獨立一行" },
             location: { type: Type.STRING, description: "地點或店名" },
@@ -171,14 +176,32 @@ app.post("/api/auto-upload", async (req, res) => {
   }
 });
 
-// API endpoint to update completion status
-app.patch("/api/items/:id/complete", async (req, res) => {
-  const { isCompleted, completionNote, completionDate } = req.body;
+// API endpoint to update item category/subcategory
+app.patch("/api/items/:id/category", async (req, res) => {
+  const { category, subCategory } = req.body;
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('items')
-      .update({ isCompleted, completionNote, completionDate })
+      .update({ category, subCategory })
+      .match({ id: req.params.id })
+      .select();
+    
+    if (error) throw error;
+    res.json(data[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API endpoint to update completion status
+app.patch("/api/items/:id/complete", async (req, res) => {
+  const { isCompleted, completionNote, completionDate, rating } = req.body;
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('items')
+      .update({ isCompleted, completionNote, completionDate, rating })
       .match({ id: req.params.id })
       .select();
     
