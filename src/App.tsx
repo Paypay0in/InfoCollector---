@@ -113,7 +113,10 @@ export default function App() {
         body: JSON.stringify({ imageBase64: compressedBase64 }),
       });
 
-      if (!response.ok) throw new Error('Upload failed');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
       
       const { data: result, id } = await response.json();
       
@@ -132,9 +135,9 @@ export default function App() {
       };
 
       setItems(prev => [newItem, ...prev]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing image:', error);
-      alert('處理圖片時發生錯誤，請稍後再試。');
+      alert(`處理失敗：${error.message}`);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

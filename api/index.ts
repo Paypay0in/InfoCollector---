@@ -113,14 +113,17 @@ app.post("/api/auto-upload", async (req, res) => {
 
     if (dbError) {
       console.error("Supabase Insert Error:", dbError);
-      return res.status(500).json({ error: `Database Error: ${dbError.message}` });
+      return res.status(500).json({ 
+        error: `資料庫寫入失敗：${dbError.message}`,
+        details: dbError
+      });
     }
     
     res.json({ success: true, id: data[0].id, data: result });
   } catch (error: any) {
     console.error("Full Process Error:", error);
     res.status(500).json({ 
-      error: error.message || "Failed to process image",
+      error: `AI 分析失敗或超時：${error.message}`,
       details: error.stack
     });
   }
