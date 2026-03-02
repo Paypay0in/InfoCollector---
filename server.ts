@@ -2,26 +2,14 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-import Database from "better-sqlite3";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
-const db = new Database("items.db");
-db.exec(`
-  CREATE TABLE IF NOT EXISTS items (
-    id TEXT PRIMARY KEY,
-    title TEXT,
-    category TEXT,
-    subCategory TEXT,
-    content TEXT,
-    location TEXT,
-    region TEXT,
-    subwayStation TEXT,
-    nearbyCollege TEXT,
-    link TEXT,
-    timestamp INTEGER
-  )
-`);
+// Supabase Client Initialization
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
@@ -32,9 +20,14 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
 
   // API endpoint to fetch items
-  app.get("/api/items", (req, res) => {
-    const items = db.prepare("SELECT * FROM items ORDER BY timestamp DESC").all();
-    res.json(items);
+  app.get("/api/items", async (req, res) => {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .order('timestamp', { ascending: false });
+    
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
   });
 
   // API endpoint for mobile automation (iOS Shortcuts / Tasker)
@@ -96,27 +89,29 @@ async function startServer() {
       });
 
       const result = JSON.parse(response.text || "{}");
-      const id = crypto.randomUUID();
       const timestamp = Date.now();
 
-      db.prepare(`
-        INSERT INTO items (id, title, category, subCategory, content, location, region, subwayStation, nearbyCollege, link, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        id,
-        result.title || '未命名資訊',
-        result.category || 'OTHER',
-        result.subCategory,
-        result.content || '',
-        result.location,
-        result.region,
-        result.subwayStation,
-        result.nearbyCollege,
-        result.link,
-        timestamp
-      );
+      const { data, error } = await supabase
+        .from('items')
+        .insert([
+          {
+            title: result.title || '未命名資訊',
+            category: result.category || 'OTHER',
+            subCategory: result.subCategory,
+            content: result.content || '',
+            location: result.location,
+            region: result.region,
+            subwayStation: result.subwayStation,
+            nearbyCollege: result.nearbyCollege,
+            link: result.link,
+            timestamp: timestamp
+          }
+        ])
+        .select();
+
+      if (error) throw error;
       
-      res.json({ success: true, id, data: result });
+      res.json({ success: true, id: data[0].id, data: result });
     } catch (error) {
       console.error("Auto-upload error:", error);
       res.status(500).json({ error: "Failed to process image" });
@@ -124,8 +119,13 @@ async function startServer() {
   });
 
   // API endpoint to delete an item
-  app.delete("/api/items/:id", (req, res) => {
-    db.prepare("DELETE FROM items WHERE id = ?").run(req.params.id);
+  app.delete("/api/items/:id", async (req, res) => {
+    const { error } = await supabase
+      .from('items')
+      .delete()
+      .match({ id: req.params.id });
+    
+    if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
   });
 
@@ -138,6 +138,15 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
+    // SPA fallback for production
+    app.get("*", (req, res) => {
+      res.sendFile("dist/index.html", { root: "." });
+    });
+  }
+
+  // Export for Vercel
+  if (process.env.VERCEL) {
+    return app;
   }
 
   app.listen(PORT, "0.0.0.0", () => {
@@ -145,4 +154,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// For Vercel, we need to export the app
+const serverPromise = startServer();
+export default async (req: any, res: any) => {
+  const app = await serverPromise;
+  return app(req, res);
+};
