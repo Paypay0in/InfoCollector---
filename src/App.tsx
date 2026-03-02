@@ -50,6 +50,9 @@ interface CollectedItem {
   nearbyCollege?: string;
   link?: string;
   timestamp: number;
+  isCompleted?: boolean;
+  completionNote?: string;
+  completionDate?: string;
 }
 
 const App: React.FC = () => {
@@ -61,7 +64,49 @@ const App: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CollectedItem | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // Completion form state
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [note, setNote] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectedItem) {
+      setNote(selectedItem.completionNote || '');
+      setDate(selectedItem.completionDate || new Date().toISOString().split('T')[0]);
+      setIsCompleting(false);
+    }
+  }, [selectedItem]);
+
+  const toggleComplete = async (id: string, isCompleted: boolean) => {
+    try {
+      const response = await fetch(`/api/items/${id}/complete`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          isCompleted, 
+          completionNote: isCompleted ? note : null, 
+          completionDate: isCompleted ? date : null 
+        }),
+      });
+      if (response.ok) {
+        const updatedItem = await response.json();
+        setItems(prev => prev.map(item => item.id === id ? { ...item, ...updatedItem } : item));
+        setSelectedItem(prev => prev?.id === id ? { ...prev, ...updatedItem } : prev);
+        setIsCompleting(false);
+      }
+    } catch (e) {
+      console.error('Failed to update completion status', e);
+    }
+  };
+
+  const getCompleteLabel = (cat: Category) => {
+    if (cat === Category.FOOD) return '已訪';
+    if (cat === Category.LEARNING) return '已閱讀';
+    return '已完成';
+  };
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -313,9 +358,17 @@ const App: React.FC = () => {
                 >
                   <div className={viewMode === 'grid' ? "p-5 sm:p-6" : "flex-1 px-4"}>
                     <div className="flex items-start justify-between mb-3 sm:mb-4">
-                      <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border ${theme.bg} ${theme.text} ${theme.border} text-[10px] font-bold uppercase tracking-wider`}>
-                        {theme.icon}
-                        <span>{item.subCategory || item.category}</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border ${theme.bg} ${theme.text} ${theme.border} text-[10px] font-bold uppercase tracking-wider`}>
+                          {theme.icon}
+                          <span>{item.subCategory || item.category}</span>
+                        </div>
+                        {item.isCompleted && (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                            <Plus className="w-3 h-3 rotate-45" />
+                            <span>{getCompleteLabel(item.category)}</span>
+                          </div>
+                        )}
                       </div>
                       <button 
                         onClick={(e) => deleteItem(item.id, e)}
@@ -498,6 +551,74 @@ const App: React.FC = () => {
                         查看 Google Maps
                       </a>
                     )}
+
+                    {/* Completion Section */}
+                    <div className="pt-4 border-t border-zinc-100">
+                      {!selectedItem.isCompleted && !isCompleting ? (
+                        <button 
+                          onClick={() => setIsCompleting(true)}
+                          className="flex items-center justify-center gap-2 w-full py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-sm font-bold hover:bg-emerald-100 transition-all active:scale-95"
+                        >
+                          <Plus className="w-4 h-4" />
+                          標記為{getCompleteLabel(selectedItem.category)}
+                        </button>
+                      ) : isCompleting ? (
+                        <div className="space-y-4 bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
+                          <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">填寫{getCompleteLabel(selectedItem.category)}資訊</h4>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-[10px] text-zinc-400 font-bold uppercase block mb-1">日期</label>
+                              <input 
+                                type="date" 
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-black"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-zinc-400 font-bold uppercase block mb-1">備註</label>
+                              <textarea 
+                                placeholder="寫下您的心得或備註..."
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-black min-h-[80px]"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setIsCompleting(false)}
+                                className="flex-1 py-2 text-sm font-medium text-zinc-500 hover:bg-zinc-100 rounded-xl transition-all"
+                              >
+                                取消
+                              </button>
+                              <button 
+                                onClick={() => toggleComplete(selectedItem.id, true)}
+                                className="flex-1 py-2 bg-black text-white text-sm font-bold rounded-xl hover:bg-zinc-800 transition-all"
+                              >
+                                確認
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                              <Plus className="w-3 h-3 rotate-45" />
+                              {getCompleteLabel(selectedItem.category)}記錄
+                            </h4>
+                            <button 
+                              onClick={() => toggleComplete(selectedItem.id, false)}
+                              className="text-[10px] font-bold text-zinc-400 hover:text-red-500 transition-colors"
+                            >
+                              撤銷標記
+                            </button>
+                          </div>
+                          <p className="text-xs text-emerald-700 font-bold mb-1">{selectedItem.completionDate}</p>
+                          <p className="text-sm text-emerald-600 whitespace-pre-line">{selectedItem.completionNote || '無備註'}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

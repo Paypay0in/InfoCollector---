@@ -171,6 +171,24 @@ app.post("/api/auto-upload", async (req, res) => {
   }
 });
 
+// API endpoint to update completion status
+app.patch("/api/items/:id/complete", async (req, res) => {
+  const { isCompleted, completionNote, completionDate } = req.body;
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('items')
+      .update({ isCompleted, completionNote, completionDate })
+      .match({ id: req.params.id })
+      .select();
+    
+    if (error) throw error;
+    res.json(data[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // API endpoint to delete an item
 app.delete("/api/items/:id", async (req, res) => {
   try {
