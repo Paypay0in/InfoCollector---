@@ -91,7 +91,9 @@ app.post("/api/auto-upload", async (req, res) => {
     const result = JSON.parse(response.text || "{}");
     const timestamp = Date.now();
 
-    const { data, error } = await supabase
+    console.log("AI analysis successful, inserting into Supabase...");
+
+    const { data, error: dbError } = await supabase
       .from('items')
       .insert([
         {
@@ -109,12 +111,18 @@ app.post("/api/auto-upload", async (req, res) => {
       ])
       .select();
 
-    if (error) throw error;
+    if (dbError) {
+      console.error("Supabase Insert Error:", dbError);
+      return res.status(500).json({ error: `Database Error: ${dbError.message}` });
+    }
     
     res.json({ success: true, id: data[0].id, data: result });
   } catch (error: any) {
-    console.error("Auto-upload error:", error);
-    res.status(500).json({ error: error.message || "Failed to process image" });
+    console.error("Full Process Error:", error);
+    res.status(500).json({ 
+      error: error.message || "Failed to process image",
+      details: error.stack
+    });
   }
 });
 
