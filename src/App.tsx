@@ -138,10 +138,15 @@ const App: React.FC = () => {
     }
   };
 
-  const getCompleteLabel = (cat: Category) => {
-    if (cat === Category.FOOD) return '已訪';
-    if (cat === Category.LEARNING) return '已閱讀';
-    if (cat === Category.SHOPPING) return '已購買';
+  const getCompleteLabel = (item: CollectedItem) => {
+    if (item.category === Category.FOOD) return '已訪';
+    if (item.category === Category.LEARNING) return '已閱讀';
+    if (item.category === Category.SHOPPING) return '已購買';
+    if (item.category === Category.OTHER) {
+      if (item.subCategory?.includes('影集') || item.subCategory?.includes('電影')) return '已觀看';
+      if (item.subCategory?.includes('書籍')) return '已閱讀';
+      return '已完成';
+    }
     return '已完成';
   };
 
@@ -380,7 +385,7 @@ const App: React.FC = () => {
         <div className="sticky top-16 z-20 bg-white border-b border-zinc-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="flex items-center justify-between sm:justify-start sm:gap-8 overflow-x-auto no-scrollbar">
-              {[Category.ALL, Category.FOOD, Category.LEARNING, Category.SHOPPING].map((cat) => {
+              {[Category.ALL, Category.FOOD, Category.LEARNING, Category.SHOPPING, Category.OTHER].map((cat) => {
                 const isActive = filter === cat;
                 const label = cat === Category.ALL ? '全部' : getCategoryTheme(cat).label;
                 return (
@@ -507,8 +512,8 @@ const App: React.FC = () => {
                         <div className="flex flex-wrap gap-2">
                           {[
                             { id: 'ALL', label: '全部' },
-                            { id: 'PENDING', label: filter === Category.FOOD ? '未訪' : filter === Category.LEARNING ? '未讀' : filter === Category.SHOPPING ? '未買' : '未完成' },
-                            { id: 'COMPLETED', label: filter === Category.FOOD ? '已訪' : filter === Category.LEARNING ? '已讀' : filter === Category.SHOPPING ? '已買' : '已完成' }
+                            { id: 'PENDING', label: filter === Category.FOOD ? '未訪' : filter === Category.LEARNING ? '未讀' : filter === Category.SHOPPING ? '未買' : filter === Category.OTHER ? '未看/未讀' : '未完成' },
+                            { id: 'COMPLETED', label: filter === Category.FOOD ? '已訪' : filter === Category.LEARNING ? '已讀' : filter === Category.SHOPPING ? '已買' : filter === Category.OTHER ? '已看/已讀' : '已完成' }
                           ].map(s => (
                             <button
                               key={s.id}
@@ -618,7 +623,7 @@ const App: React.FC = () => {
                         {item.isCompleted && (
                           <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
                             <Plus className="w-3 h-3 rotate-45" />
-                            <span>{getCompleteLabel(item.category)}</span>
+                            <span>{getCompleteLabel(item)}</span>
                             {item.rating && item.rating > 0 && (
                               <span className="ml-1 flex items-center gap-0.5">
                                 <Star className="w-2.5 h-2.5 fill-current" />
@@ -960,11 +965,11 @@ const App: React.FC = () => {
                           className="flex items-center justify-center gap-2 w-full py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-sm font-bold hover:bg-emerald-100 transition-all active:scale-95"
                         >
                           <Plus className="w-4 h-4" />
-                          標記為{getCompleteLabel(selectedItem.category)}
+                          標記為{getCompleteLabel(selectedItem)}
                         </button>
                       ) : isCompleting ? (
                         <div className="space-y-4 bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
-                          <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">填寫{getCompleteLabel(selectedItem.category)}資訊</h4>
+                          <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">填寫{getCompleteLabel(selectedItem)}資訊</h4>
                           <div className="space-y-3">
                             <div>
                               <label className="text-[10px] text-zinc-400 font-bold uppercase block mb-1">評價星等</label>
@@ -1021,7 +1026,7 @@ const App: React.FC = () => {
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1">
                               <Plus className="w-3 h-3 rotate-45" />
-                              {getCompleteLabel(selectedItem.category)}記錄
+                              {getCompleteLabel(selectedItem)}記錄
                             </h4>
                             <button 
                               onClick={() => toggleComplete(selectedItem.id, false)}
