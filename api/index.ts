@@ -104,13 +104,15 @@ app.post("/api/auto-upload", async (req, res) => {
    - 必須進一步識別子分類 (subCategory)：影集、電影、書籍、展覽等。
 
 請為每個項目執行以下任務：
-1. **標題提取**：請明確寫出被分享的「店家名稱」與「具體商品/餐點名稱/影集名/書名」。禁止使用如「挖寶」、「好物分享」、「必買」等模糊字眼。格式範例：「[店家名/作者/平台] - [商品名/書名/影集名]」。
-2. **內容摘要**：請提取重點並保持極簡（不超過 3 個短句）。**請直接使用換行符號來分隔每一點，不要使用 \\n 字串**。
-3. **子分類識別**：請務必識別具體類型。
-4. 找出該地點所屬的「行政區或地區 (Region/Area)」，例如：信義區、大安區、澀谷、中西區等。
+1. **標題提取**：請明確寫出被分享的「店家名稱」與「具體商品/餐點名稱/影集名/書名」。格式範例：「[店家名/作者/平台] - [名稱]」。
+2. **內容摘要**：請提取重點並保持極簡（不超過 3 個短句）。請直接使用換行符號來分隔每一點。
+3. **資源搜尋 (重要)**：
+   - 如果是 **LEARNING**，請搜尋並提供最相關的學習資源連結（如：官方文件、教學影片、課程連結）。
+   - 如果是 **OTHER** 中的影集/電影，請搜尋其所在的串流平台（如 Netflix, Disney+, HBO）。**如果是 Netflix，請特別註明該影片目前在哪些國家/地區上架**。
+   - 請務必提供該資源的直接連結 (Direct Link)。
+4. 找出該地點所屬的「行政區或地區 (Region/Area)」。
 5. 找出該地點最近的「地鐵/捷運站點 (Subway Station)」。
-6. 找出該地點附近是否有「大學或學院 (College/University)」，並簡述。
-7. 提供 Google Maps 連結或相關參考連結。
+6. 提供 Google Maps 連結或相關參考連結。
 
 請以繁體中文回答。`,
             },
@@ -118,21 +120,22 @@ app.post("/api/auto-upload", async (req, res) => {
         },
       ],
       config: {
+        tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              title: { type: Type.STRING, description: "明確的標題，格式為：來源 - 名稱。禁止使用模糊字眼。" },
+              title: { type: Type.STRING, description: "明確的標題" },
               category: { type: Type.STRING, description: "分類 (FOOD, LEARNING, SHOPPING, OTHER)" },
               subCategory: { type: Type.STRING, description: "具體的子分類" },
-              content: { type: Type.STRING, description: "內容摘要，使用換行符分隔多個要點" },
+              content: { type: Type.STRING, description: "內容摘要" },
               location: { type: Type.STRING, description: "地點或店名" },
               region: { type: Type.STRING, description: "行政區或地區名稱" },
               subwayStation: { type: Type.STRING, description: "最近的地鐵/捷運站" },
-              nearbyCollege: { type: Type.STRING, description: "附近的學校或學院" },
-              link: { type: Type.STRING, description: "Google Maps 或相關連結" },
+              link: { type: Type.STRING, description: "主要連結 (Google Maps 或 資源連結)" },
+              resourceMeta: { type: Type.STRING, description: "資源補充資訊（如：Netflix 上架國家、平台名稱等）" },
             },
             required: ["title", "category", "content"],
           },
@@ -149,18 +152,25 @@ app.post("/api/auto-upload", async (req, res) => {
 
     console.log(`AI analysis successful, found ${results.length} items. Inserting into Supabase...`);
 
-    const itemsToInsert = results.map(result => ({
-      title: result.title || '未命名資訊',
-      category: result.category || 'OTHER',
-      subCategory: result.subCategory,
-      content: result.content || '',
-      location: result.location,
-      region: result.region,
-      subwayStation: result.subwayStation,
-      nearbyCollege: result.nearbyCollege,
-      link: result.link,
-      timestamp: timestamp
-    }));
+    const itemsToInsert = results.map(result => {
+      let finalContent = result.content || '';
+      if (result.resourceMeta) {
+        finalContent += `\n\n📌 資源資訊：${result.resourceMeta}`;
+      }
+      
+      return {
+        title: result.title || '未命名資訊',
+        category: result.category || 'OTHER',
+        subCategory: result.subCategory,
+        content: finalContent,
+        location: result.location,
+        region: result.region,
+        subwayStation: result.subwayStation,
+        nearbyCollege: result.nearbyCollege,
+        link: result.link,
+        timestamp: timestamp
+      };
+    });
 
     const { data, error: dbError } = await supabase
       .from('items')

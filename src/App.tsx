@@ -947,7 +947,11 @@ const App: React.FC = () => {
                         className="flex items-center justify-center gap-2 w-full py-4 bg-black text-white rounded-2xl text-sm font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-black/10"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        查看 Google Maps
+                        {selectedItem.category === Category.FOOD || selectedItem.category === Category.SHOPPING 
+                          ? '查看 Google Maps' 
+                          : selectedItem.category === Category.LEARNING 
+                            ? '前往學習資源' 
+                            : '前往觀看/查看'}
                       </a>
                     )}
 
