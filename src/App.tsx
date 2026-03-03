@@ -150,6 +150,12 @@ const App: React.FC = () => {
     return '已完成';
   };
 
+  const formatContent = (content: string) => {
+    if (!content) return '';
+    // Replace literal \n or /n with actual newlines
+    return content.replace(/\\n/g, '\n').replace(/\/n/g, '\n');
+  };
+
   useEffect(() => {
     const fetchItems = async () => {
       try {
@@ -218,23 +224,11 @@ const App: React.FC = () => {
       }
       
       const responseData = await response.json();
-      const { data: result, id } = responseData;
+      const { items: newItemsFromApi } = responseData;
       
-      const newItem: CollectedItem = {
-        id,
-        title: result.title || '未命名資訊',
-        category: (result.category as Category) || Category.OTHER,
-        subCategory: result.subCategory,
-        content: result.content || '',
-        location: result.location,
-        region: result.region,
-        subwayStation: result.subwayStation,
-        nearbyCollege: result.nearbyCollege,
-        link: result.link,
-        timestamp: Date.now(),
-      };
-
-      setItems(prev => [newItem, ...prev]);
+      if (Array.isArray(newItemsFromApi)) {
+        setItems(prev => [...newItemsFromApi, ...prev]);
+      }
     } catch (error: any) {
       console.error('Error processing image:', error);
       alert(`處理失敗：${error.message}`);
@@ -645,7 +639,7 @@ const App: React.FC = () => {
                     
                     <div className="space-y-3">
                       <p className="text-sm text-zinc-500 line-clamp-2 leading-relaxed whitespace-pre-line">
-                        {item.content}
+                        {formatContent(item.content)}
                       </p>
 
                       <div className="flex flex-wrap gap-2 pt-1">
@@ -900,7 +894,7 @@ const App: React.FC = () => {
                     <div>
                       <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">詳細內容</h4>
                       <p className="text-sm text-zinc-600 leading-relaxed whitespace-pre-line bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
-                        {selectedItem.content}
+                        {formatContent(selectedItem.content)}
                       </p>
                     </div>
                   </div>
