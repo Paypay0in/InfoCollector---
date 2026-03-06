@@ -1,5 +1,5 @@
 import express from "express";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
@@ -92,31 +92,26 @@ app.post("/api/auto-upload", async (req, res) => {
               },
             },
             {
-              text: `請分析這張截圖，提取關鍵資訊。
-如果包含多個獨立項目（如：三部影集、兩家餐廳），請分別提取。
+              text: `分析截圖並提取資訊。若有多個項目請分開。
 
-分類：
-1. **FOOD** (探店)：餐廳、咖啡廳。需識別子分類（如：日式、甜點）。
-2. **LEARNING** (學習)：教學、筆記。
-3. **SHOPPING** (購物)：商店、商品。
-4. **OTHER** (其他)：影集、電影、書籍、展覽。需識別子分類。
+分類：FOOD(探店), LEARNING(學習), SHOPPING(購物), OTHER(影視書籍)。
 
 任務：
-1. **標題**：直接寫出名稱即可，不需要寫資訊來源。
-2. **摘要**：請提取重點並保持極簡（不超過 3 個短句）。請使用分點符號（如：•）並換行分隔。
-3. **搜尋連結 (重要)**：
-   - 如果是 **FOOD** 或 **SHOPPING**，請務必搜尋並提供該店家的 Google Maps 連結。
-   - 如果是 **LEARNING**，提供相關學習資源連結。
-   - 如果是 **OTHER**，提供串流平台或介紹連結。
-4. **地點資訊**：識別地區 (Region) 與最近的「捷運站 (Subway Station)」。
+1. **標題**：僅名稱。
+2. **摘要**：極簡 3 點內，使用 • 符號並換行。
+3. **搜尋 (限時快搜)**：
+   - FOOD/SHOPPING: 必填 Google Maps 連結。
+   - LEARNING/OTHER: 相關資源連結。
+4. **地點**：提取地區 (Region) 與最近捷運站。
 
-請以繁體中文回答。`,
+繁體中文回答。`,
             },
           ],
         },
       ],
       config: {
         tools: [{ googleSearch: {} }],
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -129,7 +124,7 @@ app.post("/api/auto-upload", async (req, res) => {
               content: { type: Type.STRING },
               region: { type: Type.STRING },
               subwayStation: { type: Type.STRING },
-              link: { type: Type.STRING, description: "Google Maps 連結或資源連結" },
+              link: { type: Type.STRING },
             },
             required: ["title", "category", "content"],
           },
