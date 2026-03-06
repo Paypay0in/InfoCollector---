@@ -104,8 +104,11 @@ app.post("/api/auto-upload", async (req, res) => {
 任務：
 1. **標題**：格式「[來源] - [名稱]」。
 2. **摘要**：極簡 3 句內，直接換行分隔。
-3. **地點資訊**：如果是實體店，識別地區 (Region) 與 Google Maps 搜尋關鍵字。
-4. **影集/書籍**：識別串流平台或作者。
+3. **搜尋連結 (重要)**：
+   - 如果是 **FOOD** 或 **SHOPPING**，請務必搜尋並提供該店家的 Google Maps 連結。
+   - 如果是 **LEARNING**，提供相關學習資源連結。
+   - 如果是 **OTHER**，提供串流平台或介紹連結。
+4. **地點資訊**：識別地區 (Region)。
 
 請以繁體中文回答。`,
             },
@@ -113,6 +116,7 @@ app.post("/api/auto-upload", async (req, res) => {
         },
       ],
       config: {
+        tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -124,7 +128,7 @@ app.post("/api/auto-upload", async (req, res) => {
               subCategory: { type: Type.STRING },
               content: { type: Type.STRING },
               region: { type: Type.STRING },
-              link: { type: Type.STRING, description: "相關搜尋連結或 Maps 連結" },
+              link: { type: Type.STRING, description: "Google Maps 連結或資源連結" },
             },
             required: ["title", "category", "content"],
           },
