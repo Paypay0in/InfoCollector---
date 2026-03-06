@@ -92,27 +92,20 @@ app.post("/api/auto-upload", async (req, res) => {
               },
             },
             {
-              text: `請分析這張截圖，提取其中的關鍵資訊。
-如果截圖中包含多個獨立的項目（例如：分享了三部影集、兩家餐廳或多個商品），請將它們分別提取為獨立的條目。
+              text: `請分析這張截圖，提取關鍵資訊。
+如果包含多個獨立項目（如：三部影集、兩家餐廳），請分別提取。
 
-請根據內容將每個項目分類為以下四類之一：
-1. **FOOD** (探店)：如果是餐廳、甜點店、咖啡廳或任何餐飲相關。
-   - 必須進一步識別子分類 (subCategory)：日式料理、美式料理、台式料理、咖啡廳、甜點、拉麵、韓式料理等。
-2. **LEARNING** (學習)：如果是學習資料、知識點、教學或筆記。
-3. **SHOPPING** (購物)：如果是商店、服飾、化妝品、電子產品或任何購物相關。
-4. **OTHER** (其他)：影集、電影、書籍、展覽或不屬於上述三類的資訊。
-   - 必須進一步識別子分類 (subCategory)：影集、電影、書籍、展覽等。
+分類：
+1. **FOOD** (探店)：餐廳、咖啡廳。需識別子分類（如：日式、甜點）。
+2. **LEARNING** (學習)：教學、筆記。
+3. **SHOPPING** (購物)：商店、商品。
+4. **OTHER** (其他)：影集、電影、書籍、展覽。需識別子分類。
 
-請為每個項目執行以下任務：
-1. **標題提取**：請明確寫出被分享的「店家名稱」與「具體商品/餐點名稱/影集名/書名」。格式範例：「[店家名/作者/平台] - [名稱]」。
-2. **內容摘要**：請提取重點並保持極簡（不超過 3 個短句）。請直接使用換行符號來分隔每一點。
-3. **資源搜尋 (重要)**：
-   - 如果是 **LEARNING**，請搜尋並提供最相關的學習資源連結（如：官方文件、教學影片、課程連結）。
-   - 如果是 **OTHER** 中的影集/電影，請搜尋其所在的串流平台（如 Netflix, Disney+, HBO）。**如果是 Netflix，請特別註明該影片目前在哪些國家/地區上架**。
-   - 請務必提供該資源的直接連結 (Direct Link)。
-4. 找出該地點所屬的「行政區或地區 (Region/Area)」。
-5. 找出該地點最近的「地鐵/捷運站點 (Subway Station)」。
-6. 提供 Google Maps 連結或相關參考連結。
+任務：
+1. **標題**：格式「[來源] - [名稱]」。
+2. **摘要**：極簡 3 句內，直接換行分隔。
+3. **地點資訊**：如果是實體店，識別地區 (Region) 與 Google Maps 搜尋關鍵字。
+4. **影集/書籍**：識別串流平台或作者。
 
 請以繁體中文回答。`,
             },
@@ -120,22 +113,18 @@ app.post("/api/auto-upload", async (req, res) => {
         },
       ],
       config: {
-        tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              title: { type: Type.STRING, description: "明確的標題" },
-              category: { type: Type.STRING, description: "分類 (FOOD, LEARNING, SHOPPING, OTHER)" },
-              subCategory: { type: Type.STRING, description: "具體的子分類" },
-              content: { type: Type.STRING, description: "內容摘要" },
-              location: { type: Type.STRING, description: "地點或店名" },
-              region: { type: Type.STRING, description: "行政區或地區名稱" },
-              subwayStation: { type: Type.STRING, description: "最近的地鐵/捷運站" },
-              link: { type: Type.STRING, description: "主要連結 (Google Maps 或 資源連結)" },
-              resourceMeta: { type: Type.STRING, description: "資源補充資訊（如：Netflix 上架國家、平台名稱等）" },
+              title: { type: Type.STRING },
+              category: { type: Type.STRING },
+              subCategory: { type: Type.STRING },
+              content: { type: Type.STRING },
+              region: { type: Type.STRING },
+              link: { type: Type.STRING, description: "相關搜尋連結或 Maps 連結" },
             },
             required: ["title", "category", "content"],
           },
@@ -152,25 +141,18 @@ app.post("/api/auto-upload", async (req, res) => {
 
     console.log(`AI analysis successful, found ${results.length} items. Inserting into Supabase...`);
 
-    const itemsToInsert = results.map(result => {
-      let finalContent = result.content || '';
-      if (result.resourceMeta) {
-        finalContent += `\n\n📌 資源資訊：${result.resourceMeta}`;
-      }
-      
-      return {
-        title: result.title || '未命名資訊',
-        category: result.category || 'OTHER',
-        subCategory: result.subCategory,
-        content: finalContent,
-        location: result.location,
-        region: result.region,
-        subwayStation: result.subwayStation,
-        nearbyCollege: result.nearbyCollege,
-        link: result.link,
-        timestamp: timestamp
-      };
-    });
+    const itemsToInsert = results.map(result => ({
+      title: result.title || '未命名資訊',
+      category: result.category || 'OTHER',
+      subCategory: result.subCategory,
+      content: result.content || '',
+      location: result.location,
+      region: result.region,
+      subwayStation: result.subwayStation,
+      nearbyCollege: result.nearbyCollege,
+      link: result.link,
+      timestamp: timestamp
+    }));
 
     const { data, error: dbError } = await supabase
       .from('items')
