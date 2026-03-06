@@ -27,7 +27,7 @@ import {
   Navigation
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -174,6 +174,7 @@ const App: React.FC = () => {
   const processFile = async (file: File) => {
     setIsUploading(true);
     try {
+      console.log('Starting image processing...');
       const compressedBase64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -184,7 +185,7 @@ const App: React.FC = () => {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-            const MAX_SIZE = 1200;
+            const MAX_SIZE = 800; // 再次縮小尺寸以極速傳輸
             if (width > height) {
               if (width > MAX_SIZE) {
                 height *= MAX_SIZE / width;
@@ -200,30 +201,80 @@ const App: React.FC = () => {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx?.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.7));
+            resolve(canvas.toDataURL('image/jpeg', 0.5)); // 質量降至 0.5
           };
         };
       });
 
-      const response = await fetch('/api/auto-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: compressedBase64 }),
+      console.log('Image compressed, calling Gemini...');
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key 尚未設定，請檢查環境變數");
+
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: compressedBase64.split(",")[1] || compressedBase64,
+                },
+              },
+              {
+                text: `分析截圖提取資訊。多項目請分開。
+分類：FOOD, LEARNING, SHOPPING, OTHER。
+任務：
+1. 標題：僅名稱。
+2. 摘要：分點(•)換行，極簡。
+3. 連結：FOOD/SHOPPING必填Google Maps搜尋連結(query=名稱+地區)。
+4. 地點：提取地區與捷運站。
+繁體中文JSON回答。`,
+              },
+            ],
+          },
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                category: { type: Type.STRING },
+                subCategory: { type: Type.STRING },
+                content: { type: Type.STRING },
+                region: { type: Type.STRING },
+                subwayStation: { type: Type.STRING },
+                link: { type: Type.STRING },
+              },
+              required: ["title", "category", "content"],
+            },
+          },
+        },
       });
 
-      if (!response.ok) {
-        let errorMessage = 'Upload failed';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch (e) {
-          const text = await response.text();
-          errorMessage = text || errorMessage;
-        }
-        throw new Error(errorMessage);
+      console.log('Gemini responded, parsing results...');
+      const results = JSON.parse(response.text || "[]");
+      
+      if (!Array.isArray(results) || results.length === 0) {
+        throw new Error("AI 未能識別出有效資訊");
+      }
+
+      // Save results to database via backend
+      const saveResponse = await fetch('/api/save-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ results }),
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error('儲存失敗');
       }
       
-      const responseData = await response.json();
+      const responseData = await saveResponse.json();
       const { items: newItemsFromApi } = responseData;
       
       if (Array.isArray(newItemsFromApi)) {

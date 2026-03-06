@@ -69,78 +69,18 @@ app.get("/api/items", async (req, res) => {
   }
 });
 
-// API endpoint for mobile automation
-app.post("/api/auto-upload", async (req, res) => {
-  const { imageBase64 } = req.body;
-  if (!imageBase64) {
-    return res.status(400).json({ error: "No image provided" });
+// API endpoint to save items processed by AI on the frontend
+app.post("/api/save-items", async (req, res) => {
+  const { results } = req.body;
+  
+  if (!Array.isArray(results)) {
+    return res.status(400).json({ error: "Results must be an array" });
   }
 
   try {
-    const ai = getAI();
     const supabase = getSupabase();
-    
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          parts: [
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: imageBase64.split(",")[1] || imageBase64,
-              },
-            },
-            {
-              text: `分析截圖並提取資訊。若有多個項目請分開。
-
-分類：FOOD(探店), LEARNING(學習), SHOPPING(購物), OTHER(影視書籍)。
-
-任務：
-1. **標題**：僅名稱。
-2. **摘要**：極簡 3 點內，使用 • 符號並換行。
-3. **搜尋 (限時快搜)**：
-   - FOOD/SHOPPING: 必填 Google Maps 連結。
-   - LEARNING/OTHER: 相關資源連結。
-4. **地點**：提取地區 (Region) 與最近捷運站。
-
-繁體中文回答。`,
-            },
-          ],
-        },
-      ],
-      config: {
-        tools: [{ googleSearch: {} }],
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              category: { type: Type.STRING },
-              subCategory: { type: Type.STRING },
-              content: { type: Type.STRING },
-              region: { type: Type.STRING },
-              subwayStation: { type: Type.STRING },
-              link: { type: Type.STRING },
-            },
-            required: ["title", "category", "content"],
-          },
-        },
-      },
-    });
-
-    const results = JSON.parse(response.text || "[]");
     const timestamp = Date.now();
-
-    if (!Array.isArray(results)) {
-      throw new Error("AI returned invalid format (expected array)");
-    }
-
-    console.log(`AI analysis successful, found ${results.length} items. Inserting into Supabase...`);
-
+    
     const itemsToInsert = results.map(result => ({
       title: result.title || '未命名資訊',
       category: result.category || 'OTHER',
@@ -161,19 +101,13 @@ app.post("/api/auto-upload", async (req, res) => {
 
     if (dbError) {
       console.error("Supabase Insert Error:", dbError);
-      return res.status(500).json({ 
-        error: `資料庫寫入失敗：${dbError.message}`,
-        details: dbError
-      });
+      return res.status(500).json({ error: dbError.message });
     }
     
     res.json({ success: true, count: data.length, items: data });
   } catch (error: any) {
-    console.error("Full Process Error:", error);
-    res.status(500).json({ 
-      error: `AI 分析失敗或超時：${error.message}`,
-      details: error.stack
-    });
+    console.error("Save Items Error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
