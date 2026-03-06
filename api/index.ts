@@ -102,13 +102,13 @@ app.post("/api/auto-upload", async (req, res) => {
 4. **OTHER** (其他)：影集、電影、書籍、展覽。需識別子分類。
 
 任務：
-1. **標題**：格式「[來源] - [名稱]」。
-2. **摘要**：極簡 3 句內，直接換行分隔。
+1. **標題**：直接寫出名稱即可，不需要寫資訊來源。
+2. **摘要**：請提取重點並保持極簡（不超過 3 個短句）。請使用分點符號（如：•）並換行分隔。
 3. **搜尋連結 (重要)**：
    - 如果是 **FOOD** 或 **SHOPPING**，請務必搜尋並提供該店家的 Google Maps 連結。
    - 如果是 **LEARNING**，提供相關學習資源連結。
    - 如果是 **OTHER**，提供串流平台或介紹連結。
-4. **地點資訊**：識別地區 (Region)。
+4. **地點資訊**：識別地區 (Region) 與最近的「捷運站 (Subway Station)」。
 
 請以繁體中文回答。`,
             },
@@ -128,6 +128,7 @@ app.post("/api/auto-upload", async (req, res) => {
               subCategory: { type: Type.STRING },
               content: { type: Type.STRING },
               region: { type: Type.STRING },
+              subwayStation: { type: Type.STRING },
               link: { type: Type.STRING, description: "Google Maps 連結或資源連結" },
             },
             required: ["title", "category", "content"],
