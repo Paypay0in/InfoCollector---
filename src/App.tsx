@@ -271,7 +271,8 @@ const App: React.FC = () => {
       });
 
       if (!saveResponse.ok) {
-        throw new Error('儲存失敗');
+        const errorData = await saveResponse.json();
+        throw new Error(`資料庫儲存失敗：${errorData.error || saveResponse.statusText}`);
       }
       
       const responseData = await saveResponse.json();
