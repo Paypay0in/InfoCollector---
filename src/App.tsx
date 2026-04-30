@@ -90,6 +90,111 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedText = params.get('text');
+    const sharedUrl = params.get('url');
+    const title = params.get('title');
+
+    if (sharedText || sharedUrl) {
+      // Clear query params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      const contentToProcess = sharedText || sharedUrl || '';
+      if (contentToProcess) {
+        processSharedContent(contentToProcess, title || '');
+      }
+    }
+  }, []);
+
+  const processSharedContent = async (sharedContent: string, sharedTitle: string) => {
+    setIsUploading(true);
+    try {
+      console.log('Processing shared content:', sharedContent);
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key 尚未設定，請檢查環境變數");
+
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            parts: [
+              {
+                text: `用戶從外部 App 分享了以下內容：
+標題：${sharedTitle}
+內容：${sharedContent}
+
+如果這是一個小紅書或其他平台的地點、美食或購物連結，請利用 Google 搜尋查找該地點的具體資訊（名稱、地區、內容）。
+
+分析並提取資訊。若有多個項目請分開。
+分類：FOOD, LEARNING, SHOPPING, OTHER。
+
+任務：
+1. 標題：僅名稱。
+2. 摘要：分點(•)換行，極簡。
+3. 連結：如果是地點或商店，必填 Google Maps 搜尋連結。
+4. 地點：提取地區與捷運站。
+
+繁體中文 JSON 回答。`,
+              },
+            ],
+          },
+        ],
+        config: {
+          tools: [{ googleSearch: {} }], // 使用搜尋來讀取連結內容
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                category: { type: Type.STRING },
+                subCategory: { type: Type.STRING },
+                content: { type: Type.STRING },
+                region: { type: Type.STRING },
+                subwayStation: { type: Type.STRING },
+                link: { type: Type.STRING },
+              },
+              required: ["title", "category", "content"],
+            },
+          },
+        },
+      });
+
+      console.log('Gemini responded to shared content...');
+      const results = JSON.parse(response.text || "[]");
+      
+      if (!Array.isArray(results) || results.length === 0) {
+        throw new Error("AI 未能識別出有效資訊");
+      }
+
+      const saveResponse = await fetch('/api/save-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ results }),
+      });
+
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json();
+        throw new Error(`資料庫儲存失敗：${errorData.error || saveResponse.statusText}`);
+      }
+      
+      const responseData = await saveResponse.json();
+      const { items: newItemsFromApi } = responseData;
+      
+      if (Array.isArray(newItemsFromApi)) {
+        setItems(prev => [...newItemsFromApi, ...prev]);
+      }
+    } catch (error: any) {
+      console.error('Error processing shared content:', error);
+      alert(`分享處理失敗：${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  useEffect(() => {
     if (selectedItem) {
       setNote(selectedItem.completionNote || '');
       setDate(selectedItem.completionDate || new Date().toISOString().split('T')[0]);
@@ -373,6 +478,13 @@ const App: React.FC = () => {
     const matchesStatus = statusFilter === 'ALL' || (statusFilter === 'COMPLETED' ? item.isCompleted : !item.isCompleted);
     
     return matchesFilter && matchesRegion && matchesSubCategory && matchesRating && matchesStatus && matchesSearch;
+  }).sort((a, b) => {
+    // 已完成的項目排在下面
+    if (a.isCompleted !== b.isCompleted) {
+      return a.isCompleted ? 1 : -1;
+    }
+    // 其餘按時間排序（較新的在前面）
+    return b.timestamp - a.timestamp;
   });
 
   const regions = Array.from(new Set(items.map(i => i.region).filter(Boolean))) as string[];
