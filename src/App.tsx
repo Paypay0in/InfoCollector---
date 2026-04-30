@@ -16,6 +16,7 @@ import {
   LayoutGrid,
   List as ListIcon,
   X,
+  Link as LinkIcon,
   Upload,
   Loader2,
   TrainFront,
@@ -105,6 +106,16 @@ const App: React.FC = () => {
       }
     }
   }, []);
+
+  const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
+  const [inputUrl, setInputUrl] = useState('');
+
+  const handlePasteUrl = async () => {
+    if (!inputUrl) return;
+    setIsUrlModalOpen(false);
+    await processSharedContent(inputUrl, '手動貼上內容');
+    setInputUrl('');
+  };
 
   const processSharedContent = async (sharedContent: string, sharedTitle: string) => {
     setIsUploading(true);
@@ -850,12 +861,19 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Floating Action Button (Mobile Only) */}
-      <div className="fixed bottom-6 right-6 z-40 sm:hidden">
+      {/* Floating Actions */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
+        <button 
+          onClick={() => setIsUrlModalOpen(true)}
+          disabled={isUploading}
+          className="w-14 h-14 bg-white text-zinc-900 border border-zinc-200 rounded-2xl shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+        >
+          <LinkIcon className="w-6 h-6" />
+        </button>
         <button 
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="w-14 h-14 bg-black text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all disabled:opacity-50"
+          className="w-14 h-14 bg-black text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
         >
           {isUploading ? (
             <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -864,6 +882,55 @@ const App: React.FC = () => {
           )}
         </button>
       </div>
+
+      {/* URL Input Modal */}
+      <AnimatePresence>
+        {isUrlModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsUrlModalOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl overflow-hidden"
+            >
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">手動貼上連結</h3>
+              <p className="text-sm text-zinc-500 mb-6">貼上小紅書或任何連結，AI 將自動為您解析內容。</p>
+              
+              <div className="space-y-4">
+                <textarea
+                  autoFocus
+                  placeholder="請在此貼上內容或連結..."
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
+                  className="w-full min-h-[120px] p-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
+                />
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setIsUrlModalOpen(false)}
+                    className="flex-1 py-3 text-sm font-bold text-zinc-400 hover:text-zinc-600 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    onClick={handlePasteUrl}
+                    disabled={!inputUrl}
+                    className="flex-[2] py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-50 transition-all"
+                  >
+                    開始解析
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Itinerary Planner Modal */}
       <AnimatePresence>
